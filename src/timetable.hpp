@@ -5,6 +5,9 @@
 #include <iostream>
 #include <cassert>
 #include <memory>
+#include <iomanip>
+#include <map>
+#include <iostream>
 
 class Availability
 {
@@ -17,10 +20,10 @@ public:
   void Toggle(int day, int period);
   void ToggleDay(int day);
 
-  bool     Get(int day, int period);
-  uint32_t GetDay(int day);
+  bool     Get(int day, int period) const;
+  uint32_t GetDay(int day) const;
 
-  void Print(std::ostream &stream);
+  void Print(std::ostream &stream) const;
 
 private:
   int                   m_Days;
@@ -78,6 +81,11 @@ public:
                   std::shared_ptr<const Subject> subjectPtr,
                   int                            periodsPerWeek);
 
+  std::shared_ptr<const Class>   GetClass() const { return m_Class; }
+  std::shared_ptr<const Teacher> GetTeacher() const { return m_Teacher; }
+  std::shared_ptr<const Subject> GetSubject() const { return m_Subject; }
+  int GetPeriodsPerWeek() const { return m_PeriodsPerWeek; }
+
 private:
   std::shared_ptr<const Class>   m_Class   = nullptr;
   std::shared_ptr<const Teacher> m_Teacher = nullptr;
@@ -86,15 +94,23 @@ private:
   int m_PeriodsPerWeek = 1;
 };
 
+struct ScheduledLesson {
+  int                           day;
+  int                           period;
+  std::shared_ptr<const Lesson> lesson;
+};
+
+typedef std::pair<std::shared_ptr<const Lesson>, int> LessonSlot;
+
 struct TimetableConfig {
   std::string name          = "Timetable";
   int         days          = 5;
   int         periodsPerDay = 6;
 
-  std::vector<Subject> subjects;
-  std::vector<Teacher> teachers;
-  std::vector<Class>   classes;
-  std::vector<Lesson>  lessons;
+  std::vector<Subject>                 subjects;
+  std::vector<Teacher>                 teachers;
+  std::vector<Class>                   classes;
+  std::vector<std::shared_ptr<Lesson>> lessons;
 };
 
 class Timetable
@@ -102,11 +118,16 @@ class Timetable
 public:
   explicit Timetable(const TimetableConfig &config) : m_Config(config) {};
 
-  void Generate();
-  void PrintConfig(std::ostream &stream);
+  bool Generate();
+
+  void PrintConfig(std::ostream &stream) const;
+  void PrintSchedule(std::ostream &stream) const;
 
 private:
-  void GenerateImpl(int currDay, int currPeriod);
+  bool GenerateImpl(std::vector<LessonSlot> &lessonSlots, int currIdx);
+  bool IsSlotFree(int day, int period, std::shared_ptr<const Class> cls,
+                  std::shared_ptr<const Teacher> teacher);
 
-  TimetableConfig m_Config;
+  TimetableConfig              m_Config;
+  std::vector<ScheduledLesson> m_Schedule;
 };

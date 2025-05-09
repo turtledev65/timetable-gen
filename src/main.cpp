@@ -6,46 +6,70 @@ TimetableConfig getTestConfig()
   const int days          = 5;
   const int periodsPerDay = 6;
 
-  // Helper: full availability
-  auto FullAvailability = [days, periodsPerDay]() -> Availability {
+  TimetableConfig config;
+  config.name          = "Challenging Test Timetable";
+  config.days          = days;
+  config.periodsPerDay = periodsPerDay;
+
+  // Helper: Full or Partial Availability
+  auto FullAvailability = [&]() {
     Availability a(days, periodsPerDay);
-    for (int d = 0; d < days; ++d) {
+    for (int d = 0; d < days; ++d)
       a.SetDay(d, true);
-    }
     return a;
   };
 
-  // Shared availability for simplicity
-  Availability sharedAvailability = FullAvailability();
+  auto PartialAvailability = [&](std::vector<int> availableDays) {
+    Availability a(days, periodsPerDay);
+    for (int d : availableDays)
+      a.SetDay(d, true);
+    return a;
+  };
 
-  // Subjects
-  auto math    = std::make_shared<Subject>("Math", sharedAvailability);
-  auto english = std::make_shared<Subject>("English", sharedAvailability);
+  // Subjects: 15 subjects
+  std::vector<std::shared_ptr<Subject>> subjectPtrs;
+  for (int i = 0; i < 15; ++i) {
+    auto subj = std::make_shared<Subject>("Subject " + std::to_string(i + 1),
+                                          FullAvailability());
+    subjectPtrs.push_back(subj);
+    config.subjects.push_back(*subj);
+  }
 
-  // Teachers
-  auto alice = std::make_shared<Teacher>("Alice", sharedAvailability);
-  auto bob   = std::make_shared<Teacher>("Bob", sharedAvailability);
+  // Teachers: 8 teachers, some teach multiple subjects
+  std::vector<std::shared_ptr<Teacher>> teacherPtrs;
+  for (int i = 0; i < 8; ++i) {
+    Availability avail =
+        (i % 2 == 0) ? FullAvailability() : PartialAvailability({0, 1, 3});
+    auto teacher =
+        std::make_shared<Teacher>("Teacher " + std::to_string(i + 1), avail);
+    teacherPtrs.push_back(teacher);
+    config.teachers.push_back(*teacher);
+  }
 
-  // Classes
-  auto classA = std::make_shared<Class>("Class A", sharedAvailability);
-  auto classB = std::make_shared<Class>("Class B", sharedAvailability);
+  // Classes: 6 total, some with full availability, some partial
+  std::vector<std::shared_ptr<Class>> classPtrs;
+  for (int i = 0; i < 6; ++i) {
+    Availability avail =
+        (i < 4) ? FullAvailability() : PartialAvailability({1, 2, 4});
+    auto cls = std::make_shared<Class>("Class " + std::to_string(i + 1), avail);
+    classPtrs.push_back(cls);
+    config.classes.push_back(*cls);
+  }
 
-  // Lessons
-  Lesson lesson1(classA, alice, math, 2);
-  Lesson lesson2(classB, bob, english, 2);
+  // Lessons: Create 60 lessons, reusing some teachers and mixing subjects
+  for (int i = 0; i < 60; ++i) {
+    auto cls     = classPtrs[i % classPtrs.size()];
+    auto subject = subjectPtrs[i % subjectPtrs.size()];
 
-  // Timetable config
-  TimetableConfig config;
-  config.name          = "Test Timetable";
-  config.periodsPerDay = periodsPerDay;
+    // Reuse teachers: some teach multiple subjects
+    auto teacher = teacherPtrs[(i / 2) % teacherPtrs.size()];
 
-  // Subjects, Teachers, Classes (stored by value, dereference from shared_ptr)
-  config.subjects = {*math, *english};
-  config.teachers = {*alice, *bob};
-  config.classes  = {*classA, *classB};
+    // Periods: vary between 2 and 5
+    int periods = 2 + (i % 4);
 
-  // Lessons (store by value)
-  config.lessons = {lesson1, lesson2};
+    auto lesson = std::make_shared<Lesson>(cls, teacher, subject, periods);
+    config.lessons.push_back(lesson);
+  }
 
   return config;
 }
@@ -53,8 +77,12 @@ TimetableConfig getTestConfig()
 int main()
 {
   Timetable table(getTestConfig());
-  table.Generate();
   table.PrintConfig(std::cout);
 
-  std::cin.get();
+  if (!table.Generate()) {
+    std::cout << "Failed to generate";
+  }
+  // table.PrintSchedule(std::cout);
+
+  // std::cin.get();
 }
